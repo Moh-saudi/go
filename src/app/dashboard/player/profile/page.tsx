@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from '@/lib/firebase/auth-provider';
 import { auth, db } from "@/lib/firebase/config";
 import { deleteImage } from '@/lib/utils/upload';
+import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import 'firebase/compat/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Check, Plus, Trash, X } from 'lucide-react';
@@ -30,9 +31,6 @@ const SuccessMessage: React.FC<{ message: string }> = ({ message }) => (
     </div>
   </div>
 );
-
-// Supabase Client
-import { createClient } from '@supabase/supabase-js';
 
 // Types
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -311,7 +309,7 @@ const classNames = (...classes: (string | boolean | undefined | null)[]): string
 };
 
 // Supabase Setup with Type Safety
-let supabaseInstance: any = null;
+let supabaseInstance: SupabaseClient | null = null;
 
 const initSupabase = () => {
   if (supabaseInstance) return supabaseInstance;
@@ -320,8 +318,7 @@ const initSupabase = () => {
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    console.warn('Missing Supabase environment variables');
-    return null;
+    throw new Error('Missing Supabase environment variables');
   }
 
   try {
@@ -333,7 +330,7 @@ const initSupabase = () => {
     return supabaseInstance;
   } catch (error) {
     console.error('Error initializing Supabase client:', error);
-    return null;
+    throw new Error('Failed to initialize Supabase client');
   }
 };
 
@@ -421,20 +418,27 @@ interface UploadResponse {
 
 const getSupabaseWithAuth = async () => {
   const user = auth.currentUser;
-  if (!user) throw new Error('يجب تسجيل الدخول أولاً');
-  const token = await user.getIdToken();
-  console.log('Firebase JWT Token:', token); // طباعة التوكن في الكونسول
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
+  if (!user) {
+    throw new Error('يجب تسجيل الدخول أولاً');
+  }
+
+  try {
+    const token = await user.getIdToken();
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      },
-    }
-  );
+      }
+    );
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    throw new Error('فشل في الحصول على رمز المصادقة');
+  }
 };
 
 export default function PlayerProfile() {
@@ -615,14 +619,17 @@ export default function PlayerProfile() {
    * @param {string} userId - معرف المستخدم
    * @returns {Promise<string>} - رابط الصورة
    */
-  const uploadProfileImage = async (file: File, userId: string): Promise<UploadResponse> => {
+  const uploadProfileImage = async (file: File, userId: string, userToken: string): Promise<UploadResponse> => {
     const supabase = await getSupabaseWithAuth();
     const fileExt = file.name.split('.').pop();
     const fileName = `${userId}-${Date.now()}.${fileExt}`;
     const filePath = `avatars/${fileName}`;
     const { error: uploadError, data } = await supabase.storage
       .from('avatars')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
     if (uploadError) {
       console.error('Error uploading profile image:', uploadError);
       throw uploadError;
@@ -640,7 +647,7 @@ export default function PlayerProfile() {
    * @param {number} idx - فهرس الصورة (اختياري)
    * @returns {Promise<string>} - رابط الصورة
    */
-  const uploadAdditionalImage = async (file: File, userId: string): Promise<UploadResponse> => {
+  const uploadAdditionalImage = async (file: File, userId: string, userToken: string): Promise<UploadResponse> => {
     const supabase = await getSupabaseWithAuth();
     try {
       const fileExt = file.name.split('.').pop();
@@ -653,8 +660,8 @@ export default function PlayerProfile() {
           upsert: true
         });
       if (error) {
-        console.error('Error uploading additional image:', error);
-        throw error;
+        console.error('Error uploading additional image:', error.message, error.statusCode, error);
+        throw new Error(`فشل في رفع الصورة: ${error.message || 'خطأ غير معروف'} (رمز: ${error.statusCode || 'غير متوفر'})`);
       }
       const { data: urlData } = supabase.storage
         .from('player-uploads')
@@ -721,16 +728,41 @@ export default function PlayerProfile() {
     try {
       const file = e.target.files?.[0];
       if (!file) return;
+
+      // التحقق من نوع الملف
+      if (!file.type.startsWith('image/')) {
+        setFormErrors(prev => ({ ...prev, profileImage: 'يجب أن يكون الملف صورة' }));
+        return;
+      }
+
+      // التحقق من حجم الملف (5MB كحد أقصى)
+      if (file.size > 5 * 1024 * 1024) {
+        setFormErrors(prev => ({ ...prev, profileImage: 'حجم الصورة يجب أن لا يتجاوز 5 ميجابايت' }));
+        return;
+      }
+
       setUploadingProfileImage(true);
-      const userId = user?.uid || '';
-      const result = await uploadProfileImage(file, userId);
+      const userId = user?.uid;
+      if (!userId) {
+        setFormErrors(prev => ({ ...prev, profileImage: 'يجب تسجيل الدخول أولاً' }));
+        return;
+      }
+
+      // جلب التوكن من Firebase Auth
+      const userToken = await user.getIdToken();
+      const result = await uploadProfileImage(file, userId, userToken);
       if (result.error) {
         setFormErrors(prev => ({ ...prev, profileImage: result.error }));
         return;
       }
+
       setEditFormData(prev => ({ ...prev, profile_image: { url: result.url } }));
     } catch (error) {
-      setFormErrors(prev => ({ ...prev, profileImage: 'فشل في رفع الصورة. يرجى المحاولة مرة أخرى' }));
+      console.error('Error uploading profile image:', error);
+      setFormErrors(prev => ({
+        ...prev,
+        profileImage: error instanceof Error ? error.message : 'فشل في رفع الصورة. يرجى المحاولة مرة أخرى'
+      }));
     } finally {
       setUploadingProfileImage(false);
     }
@@ -745,7 +777,9 @@ export default function PlayerProfile() {
     const file = e.target.files[0];
     setIsUploading(true);
     try {
-      const result = await uploadAdditionalImage(file, user.uid);
+      // جلب التوكن من Firebase Auth
+      const userToken = await user.getIdToken();
+      const result = await uploadAdditionalImage(file, user.uid, userToken);
       if (result.url) {
         setFormData(prev => ({
           ...prev,
@@ -863,14 +897,19 @@ export default function PlayerProfile() {
   const handleSave = async () => {
     setEditLoading(true);
     setEditError('');
-    const errors = validateCurrentStep(currentStep, editFormData);
-    setFormErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      setEditLoading(false);
-      return;
-    }
+
     try {
-      console.log("بيانات النموذج قبل الحفظ:", editFormData);
+      // التحقق من صحة البيانات
+      const errors = validateCurrentStep(currentStep, editFormData);
+      setFormErrors(errors);
+      if (Object.keys(errors).length > 0) {
+        throw new Error('يرجى تصحيح الأخطاء قبل الحفظ');
+      }
+
+      // التحقق من وجود المستخدم
+      if (!user?.uid) {
+        throw new Error('يجب تسجيل الدخول أولاً');
+      }
 
       // استخراج المسارات النسبية للصور
       const profileImageUrl = editFormData.profile_image?.url || '';
@@ -885,12 +924,8 @@ export default function PlayerProfile() {
         updated_at: new Date()
       };
 
-      console.log("جاري حفظ البيانات في Firestore:", playerDataToSave);
-
       // حفظ البيانات في Firestore
-      await setDoc(doc(db, 'players', user?.uid || ''), playerDataToSave, { merge: true });
-
-      console.log("تم حفظ البيانات بنجاح");
+      await setDoc(doc(db, 'players', user.uid), playerDataToSave, { merge: true });
 
       // تحديث بيانات النموذج المحلية
       setFormData({ ...editFormData });
@@ -904,7 +939,21 @@ export default function PlayerProfile() {
 
     } catch (err) {
       console.error("خطأ أثناء حفظ البيانات:", err);
-      setEditError('حدث خطأ أثناء حفظ البيانات');
+
+      // رسائل خطأ مخصصة
+      if (err instanceof Error) {
+        if (err.message.includes('permission-denied')) {
+          setEditError('ليس لديك صلاحية لحفظ البيانات');
+        } else if (err.message.includes('not-found')) {
+          setEditError('لم يتم العثور على المستخدم');
+        } else if (err.message.includes('invalid-argument')) {
+          setEditError('بيانات غير صالحة');
+        } else {
+          setEditError(err.message);
+        }
+      } else {
+        setEditError('حدث خطأ غير متوقع أثناء حفظ البيانات');
+      }
     } finally {
       setEditLoading(false);
     }
@@ -1573,7 +1622,7 @@ export default function PlayerProfile() {
           <div className="p-2 mt-1 text-gray-900 bg-gray-100 rounded-md">
             {(formData.injuries || []).length === 0 ?
               'لا توجد إصابات' :
-              formData.injuries.map((inj, idx) => (
+              (Array.isArray(formData.injuries) ? formData.injuries : []).map((inj, idx) => (
                 <div key={idx} className="py-1">
                   {inj.type} - {inj.date} - {inj.status}
                 </div>

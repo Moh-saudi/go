@@ -1,32 +1,62 @@
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    console.log("Received upload request");
-    
-    // Get form data
-    const formData = await request.formData();
-    const file = formData.get('file');
-    
-    if (!file) {
-      console.log("No file found");
-      return NextResponse.json(
-        { error: 'لا يوجد ملف' },
-        { status: 400 }
-      );
+    // جلب التوكن من الهيدر
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'مفقود رمز المصادقة' }, { status: 401 });
+    }
+    const token = authHeader.replace('Bearer ', '');
+
+    // تهيئة supabase client مع التوكن
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      }
+    );
+
+    // جلب المستخدم من التوكن
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return NextResponse.json({ error: 'المستخدم غير مصادق' }, { status: 401 });
     }
 
-    // Just for testing, return success
-    return NextResponse.json({
-      url: "https://test-url.com/test-image.jpg",
-      success: true
-    });
+    // جلب الملف من الطلب
+    const formData = await request.formData();
+    const file = formData.get('file');
+    if (!file) {
+      return NextResponse.json({ error: 'لم يتم إرسال ملف' }, { status: 400 });
+    }
 
+    // بناء المسار الصحيح
+    const filePath = `${user.id}/additional/${Date.now()}-${file.name}`;
+
+    // رفع الملف إلى Supabase Storage
+    const { data, error: uploadError } = await supabase.storage
+      .from('player-uploads')
+      .upload(filePath, file.stream(), {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError.message }, { status: 400 });
+    }
+
+    // جلب الرابط العام
+    const { data: publicUrl } = supabase
+      .storage
+      .from('player-uploads')
+      .getPublicUrl(data.path);
+
+    return NextResponse.json({ url: publicUrl.publicUrl }, { status: 200 });
   } catch (error) {
-    console.error("Upload error:", error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message || 'Unknown error' }, { status: 500 });
   }
 }
