@@ -660,8 +660,8 @@ export default function PlayerProfile() {
           upsert: true
         });
       if (error) {
-        console.error('Error uploading additional image:', error.message, error.statusCode, error);
-        throw new Error(`فشل في رفع الصورة: ${error.message || 'خطأ غير معروف'} (رمز: ${error.statusCode || 'غير متوفر'})`);
+        console.error('Error uploading additional image:', error.message, error);
+        throw new Error(`فشل في رفع الصورة: ${error.message || 'خطأ غير معروف'}`);
       }
       const { data: urlData } = supabase.storage
         .from('player-uploads')
