@@ -728,34 +728,26 @@ export default function PlayerProfile() {
     try {
       const file = e.target.files?.[0];
       if (!file) return;
-
-      // التحقق من نوع الملف
       if (!file.type.startsWith('image/')) {
         setFormErrors(prev => ({ ...prev, profileImage: 'يجب أن يكون الملف صورة' }));
         return;
       }
-
-      // التحقق من حجم الملف (5MB كحد أقصى)
       if (file.size > 5 * 1024 * 1024) {
         setFormErrors(prev => ({ ...prev, profileImage: 'حجم الصورة يجب أن لا يتجاوز 5 ميجابايت' }));
         return;
       }
-
       setUploadingProfileImage(true);
       const userId = user?.uid;
       if (!userId) {
         setFormErrors(prev => ({ ...prev, profileImage: 'يجب تسجيل الدخول أولاً' }));
         return;
       }
-
-      // جلب التوكن من Firebase Auth
       const userToken = await user.getIdToken();
       const result = await uploadProfileImage(file, userId, userToken);
       if (result.error) {
         setFormErrors(prev => ({ ...prev, profileImage: result.error }));
         return;
       }
-
       setEditFormData(prev => ({ ...prev, profile_image: { url: result.url } }));
     } catch (error) {
       console.error('Error uploading profile image:', error);
@@ -777,7 +769,6 @@ export default function PlayerProfile() {
     const file = e.target.files[0];
     setIsUploading(true);
     try {
-      // جلب التوكن من Firebase Auth
       const userToken = await user.getIdToken();
       const result = await uploadAdditionalImage(file, user.uid, userToken);
       if (result.url) {
