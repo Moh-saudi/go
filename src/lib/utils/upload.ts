@@ -61,7 +61,7 @@ export const deleteImage = async (path: string): Promise<{ error?: string }> => 
       .remove([path]);
 
     if (error) {
-      console.error('Error deleting image:', error);
+      console.error('Error deleting image:', error.message);
       return {
         error: 'فشل في حذف الصورة'
       };
@@ -69,9 +69,11 @@ export const deleteImage = async (path: string): Promise<{ error?: string }> => 
 
     return {};
   } catch (error) {
-    console.error('Error in deleteImage:', error);
+    console.error('Error in deleteImage:', error.message);
     return {
       error: 'حدث خطأ أثناء حذف الصورة'
     };
   }
 };
+
+export { uploadAdditionalImage, deleteImage };
