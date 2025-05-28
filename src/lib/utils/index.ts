@@ -1,6 +1,6 @@
 // src/lib/utils/index.ts
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 // تم تعطيل Azure مؤقتاً
 // export { uploadFileToAzure } from "./upload";
 
@@ -28,7 +28,7 @@ export const uploadFileToStorage = async (file: File, bucket: string) => {
   try {
     const { getSupabaseClient } = await import('@/lib/supabase/config')
     const supabase = getSupabaseClient();
-    
+
     if (!supabase) {
       throw new Error('Supabase client is not available. Please check your environment variables.');
     }
