@@ -996,7 +996,8 @@ export default function PlayerProfile() {
     const file = e.target.files[0];
     setIsUploading(true);
     try {
-      const result = await uploadProfileImage(file, user.uid);
+      const userToken = await user.getIdToken();
+      const result = await uploadProfileImage(file, user.uid, userToken);
       if (result.url) {
         setFormData(prev => ({
           ...prev,

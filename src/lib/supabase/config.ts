@@ -39,7 +39,8 @@ export const STORAGE_BUCKETS = {
   AVATARS: 'avatars',
   PLAYER_IMAGES: 'player-images',
   DOCUMENTS: 'documents',
-  PAYMENT_RECEIPTS: 'payment-receipts'
+  PAYMENT_RECEIPTS: 'payment-receipts',
+  PLAYER_UPLOADS: 'player-uploads'
 } as const;
 
 // وظائف مساعدة للتعامل مع التخزين
@@ -55,12 +56,13 @@ interface PublicUrlResponse {
 export async function uploadFile(
   file: File | Blob,
   bucket: keyof typeof STORAGE_BUCKETS,
-  path: string
+  path: string,
+  userToken?: string
 ): Promise<string | null> {
   // إذا كان bucket هو player-uploads استخدم uploadAdditionalImage
-  if (bucket === 'player-uploads' && file instanceof File) {
+  if (bucket === STORAGE_BUCKETS.PLAYER_UPLOADS && file instanceof File) {
     const userId = 'USER_ID_HERE'; // استبدلها بالمعرف الفعلي للمستخدم
-    const result = await uploadAdditionalImage(file, userId);
+    const result = await uploadAdditionalImage(file, userId, userToken);
     return result.url || null;
   }
   const supabase = getSupabaseClient();
