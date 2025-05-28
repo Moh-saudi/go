@@ -41,19 +41,19 @@ async function uploadImageViaEdgeFunction(file: File, userToken: string, edgeEnd
 
 // رفع صورة البروفايل عبر دالة Edge
 export const uploadProfileImage = async (file: File, userId: string, userToken?: string): Promise<UploadResponse> => {
-  // يجب تمرير userToken وendpoint
   if (!userToken) return { url: '', error: 'مفقود رمز المصادقة' };
-  const edgeEndpoint = '/api/edge-upload-profile'; // غيّر هذا حسب مسار دالتك
+  const edgeEndpoint = '/api/edge-upload-profile';
   return uploadImageViaEdgeFunction(file, userToken, edgeEndpoint);
 };
 
 // رفع صورة إضافية عبر دالة Edge
 export const uploadAdditionalImage = async (file: File, userId: string, userToken?: string): Promise<UploadResponse> => {
   if (!userToken) return { url: '', error: 'مفقود رمز المصادقة' };
-  const edgeEndpoint = '/api/edge-upload-additional'; // غيّر هذا حسب مسار دالتك
+  const edgeEndpoint = '/api/edge-upload-additional';
   return uploadImageViaEdgeFunction(file, userToken, edgeEndpoint);
 };
 
+// حذف صورة من التخزين
 export const deleteImage = async (path: string): Promise<{ error?: string }> => {
   try {
     const { error } = await supabase.storage
@@ -69,7 +69,7 @@ export const deleteImage = async (path: string): Promise<{ error?: string }> => 
 
     return {};
   } catch (error) {
-    console.error('Error in deleteImage:', error.message);
+    console.error('Error in deleteImage:', error instanceof Error ? error.message : 'Unknown error');
     return {
       error: 'حدث خطأ أثناء حذف الصورة'
     };

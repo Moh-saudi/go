@@ -60,7 +60,7 @@ export async function uploadFile(
   userToken?: string
 ): Promise<string | null> {
   // إذا كان bucket هو player-uploads استخدم uploadAdditionalImage
-  if (bucket === STORAGE_BUCKETS.PLAYER_UPLOADS && file instanceof File) {
+  if (bucket === 'PLAYER_UPLOADS' && file instanceof File) {
     const userId = 'USER_ID_HERE'; // استبدلها بالمعرف الفعلي للمستخدم
     const result = await uploadAdditionalImage(file, userId, userToken);
     return result.url || null;
@@ -69,8 +69,9 @@ export async function uploadFile(
   if (!supabase) return null;
 
   try {
+    const bucketName = STORAGE_BUCKETS[bucket];
     const { data, error } = await supabase.storage
-      .from(bucket)
+      .from(bucketName)
       .upload(path, file, {
         cacheControl: '3600',
         upsert: true
@@ -79,7 +80,7 @@ export async function uploadFile(
     if (error) throw error;
 
     const { data: urlData } = supabase.storage
-      .from(bucket)
+      .from(bucketName)
       .getPublicUrl((data as UploadResponse).path);
 
     return (urlData as PublicUrlResponse).publicUrl;
