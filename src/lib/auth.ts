@@ -1,6 +1,18 @@
 import { SupabaseAdapter } from "@auth/supabase-adapter";
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, Session } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+
+// Extend the Session type to include user ID
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      email?: string | null;
+      name?: string | null;
+      image?: string | null;
+    }
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: SupabaseAdapter({

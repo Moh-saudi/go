@@ -75,5 +75,3 @@ export const deleteImage = async (path: string): Promise<{ error?: string }> => 
     };
   }
 };
-
-export { uploadAdditionalImage, deleteImage };
