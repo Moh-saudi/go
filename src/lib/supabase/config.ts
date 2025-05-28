@@ -65,6 +65,7 @@ export async function uploadFile(
     const result = await uploadAdditionalImage(file, userId, userToken);
     return result.url || null;
   }
+
   const supabase = getSupabaseClient();
   if (!supabase) return null;
 
