@@ -1,9 +1,9 @@
 // src/lib/supabase.js
 import { uploadAdditionalImage } from '@/lib/utils/upload';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // تنفيذ نمط العازل (singleton) للتأكد من إنشاء عميل واحد فقط
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
+let supabaseInstance: SupabaseClient | null = null;
 
 export function getSupabaseClient() {
   // If client already exists, return it
@@ -45,9 +45,9 @@ export const STORAGE_BUCKETS = {
 
 // وظائف مساعدة للتعامل مع التخزين
 // Define interfaces for better type safety
-interface UploadResponse {
+type UploadResponse = {
   path: string;
-}
+};
 
 interface PublicUrlResponse {
   publicUrl: string;
