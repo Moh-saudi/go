@@ -23,4 +23,21 @@ export const uploadProfileImage = async () => ({ url: '', error: 'رفع الص�
 export const uploadAdditionalImage = async () => ({ url: '', error: 'رفع الصور معطل نهائياً' });
 
 // حذف صورة من التخزين
-export const deleteImage = async () => ({ error: 'حذف الصور معطل نهائياً' });
+export const deleteImage = async (path: string): Promise<{ error?: string }> => {
+  try {
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
+    const { error } = await supabase.storage
+      .from('player-uploads')
+      .remove([path]);
+
+    if (error) {
+      console.error('Error deleting image:', error);
+      return { error: error.message };
+    }
+
+    return {};
+  } catch (error) {
+    console.error('Error in deleteImage:', error);
+    return { error: error instanceof Error ? error.message : 'Unknown error occurred' };
+  }
+};
