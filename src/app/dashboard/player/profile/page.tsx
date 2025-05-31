@@ -823,11 +823,6 @@ export default function PlayerProfile() {
   const handleDeleteProfileImage = async () => {
     if (!formData.profile_image?.url) return;
     try {
-      const urlParts = formData.profile_image.url.split('/');
-      const userId = user?.uid || '';
-      const pathIdx = urlParts.findIndex(part => part === userId);
-      const path = urlParts.slice(pathIdx).join('/');
-      if (!path) return;
       await deleteImage();
       setFormData(prev => ({ ...prev, profile_image: null }));
     } catch (error) {
@@ -839,13 +834,6 @@ export default function PlayerProfile() {
     try {
       const image = formData.additional_images[index];
       if (!image?.url) return;
-      // استخراج المسار النسبي من الرابط الكامل
-      const urlParts = image.url.split('/');
-      const userId = user?.uid || '';
-      // المسار: userId/additional/xxx.ext
-      const pathIdx = urlParts.findIndex(part => part === userId);
-      const path = urlParts.slice(pathIdx).join('/');
-      if (!path) return;
       await deleteImage();
       setFormData(prev => ({
         ...prev,
