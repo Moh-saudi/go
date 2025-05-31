@@ -1,11 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Default Supabase configuration
+const defaultConfig = {
+  url: 'https://your-project.supabase.co',
+  key: 'your-anon-key'
+};
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables for the new project');
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || defaultConfig.url;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || defaultConfig.key;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -25,7 +27,6 @@ export const uploadAdditionalImage = async () => ({ url: '', error: 'رفع ال
 // حذف صورة من التخزين
 export const deleteImage = async (path: string): Promise<{ error?: string }> => {
   try {
-    const supabase = createClient(supabaseUrl!, supabaseKey!);
     const { error } = await supabase.storage
       .from('player-uploads')
       .remove([path]);
