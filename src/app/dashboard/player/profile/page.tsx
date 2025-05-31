@@ -828,7 +828,7 @@ export default function PlayerProfile() {
       const pathIdx = urlParts.findIndex(part => part === userId);
       const path = urlParts.slice(pathIdx).join('/');
       if (!path) return;
-      await deleteImage(path);
+      await deleteImage();
       setFormData(prev => ({ ...prev, profile_image: null }));
     } catch (error) {
       setFormErrors(prev => ({ ...prev, profileImage: 'حدث خطأ أثناء حذف الصورة' }));
@@ -846,7 +846,7 @@ export default function PlayerProfile() {
       const pathIdx = urlParts.findIndex(part => part === userId);
       const path = urlParts.slice(pathIdx).join('/');
       if (!path) return;
-      await deleteImage(path);
+      await deleteImage();
       setFormData(prev => ({
         ...prev,
         additional_images: prev.additional_images.filter((_, i) => i !== index)
