@@ -651,9 +651,17 @@ export default function PlayerProfile() {
       const profileImageUrl = editFormData.profile_image?.url || '';
       const additionalImageUrls = editFormData.additional_images?.map(img => img.url) || [];
 
+      // دمج الفيديو الجديد إذا كان موجودًا
+      let videos = editFormData.videos || [];
+      if (newVideo.url && newVideo.desc) {
+        videos = [...videos, newVideo];
+        setNewVideo({ url: '', desc: '' });
+      }
+
       // تهيئة الكائن الذي سيتم حفظه في Firestore
       const playerDataToSave = {
         ...editFormData,
+        videos,
         profile_image: profileImageUrl ? { url: profileImageUrl } : null,
         additional_images: additionalImageUrls.map(url => ({ url })),
         birth_date: editFormData.birth_date || undefined,
@@ -664,7 +672,7 @@ export default function PlayerProfile() {
       await setDoc(doc(db, 'players', user.uid), playerDataToSave, { merge: true });
 
       // تحديث بيانات النموذج المحلية
-      setFormData({ ...editFormData });
+      setFormData({ ...editFormData, videos });
       setIsEditing(false);
       setSuccessMessage('تم حفظ البيانات بنجاح');
 
