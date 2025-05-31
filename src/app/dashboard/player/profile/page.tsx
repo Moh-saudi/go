@@ -4,9 +4,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout.jsx";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/lib/firebase/auth-provider';
 import { auth, db } from "@/lib/firebase/config";
-import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import 'firebase/compat/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteObject, getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { Check, Plus, Trash, X } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -307,29 +307,28 @@ const classNames = (...classes: (string | boolean | undefined | null)[]): string
   return classes.filter(Boolean).join(' ');
 };
 
-// Supabase Setup with Type Safety
-let supabaseInstance: SupabaseClient | null = null;
+// Firebase Storage Setup
+const storage = getStorage();
 
-const initSupabase = () => {
-  if (supabaseInstance) return supabaseInstance;
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
+const uploadFile = async (file: File, path: string): Promise<string> => {
   try {
-    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: false
-      }
-    });
-    return supabaseInstance;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    return url;
   } catch (error) {
-    console.error('Error initializing Supabase client:', error);
-    throw new Error('Failed to initialize Supabase client');
+    console.error('Error uploading file:', error);
+    throw error;
+  }
+};
+
+const deleteFile = async (url: string): Promise<void> => {
+  try {
+    const storageRef = ref(storage, url);
+    await deleteObject(storageRef);
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    throw error;
   }
 };
 
@@ -464,20 +463,63 @@ export default function PlayerProfile() {
   const [showVideoForm, setShowVideoForm] = useState(false);
 
   // دوال معطلة للصور
-  const handleProfileImageUpload = (...args: any[]) => {
-    setError('خدمة رفع الصور معطلة حالياً');
+  const handleProfileImageUpload = async (file: File) => {
+    try {
+      const path = `players/${user?.uid}/profile/${file.name}`;
+      const url = await uploadFile(file, path);
+      setFormData(prev => ({
+        ...prev,
+        profile_image: { url }
+      }));
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      setError('Failed to upload image');
+    }
   };
 
-  const handleDeleteProfileImage = () => {
-    setError('خدمة حذف الصور معطلة حالياً');
+  const handleDeleteProfileImage = async () => {
+    try {
+      if (formData.profile_image?.url) {
+        await deleteFile(formData.profile_image.url);
+        setFormData(prev => ({
+          ...prev,
+          profile_image: null
+        }));
+      }
+    } catch (error) {
+      console.error('Error deleting profile image:', error);
+      setError('Failed to delete image');
+    }
   };
 
-  const handleAdditionalImageUpload = (...args: any[]) => {
-    setError('خدمة رفع الصور الإضافية معطلة حالياً');
+  const handleAdditionalImageUpload = async (file: File) => {
+    try {
+      const path = `players/${user?.uid}/additional/${file.name}`;
+      const url = await uploadFile(file, path);
+      setFormData(prev => ({
+        ...prev,
+        additional_images: [...prev.additional_images, { url }]
+      }));
+    } catch (error) {
+      console.error('Error uploading additional image:', error);
+      setError('Failed to upload image');
+    }
   };
 
-  const handleDeleteAdditionalImage = (...args: any[]) => {
-    setError('خدمة حذف الصور الإضافية معطلة حالياً');
+  const handleDeleteAdditionalImage = async (index: number) => {
+    try {
+      const image = formData.additional_images[index];
+      if (image?.url) {
+        await deleteFile(image.url);
+        setFormData(prev => ({
+          ...prev,
+          additional_images: prev.additional_images.filter((_, i) => i !== index)
+        }));
+      }
+    } catch (error) {
+      console.error('Error deleting additional image:', error);
+      setError('Failed to delete image');
+    }
   };
 
   useEffect(() => {

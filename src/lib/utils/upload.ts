@@ -1,15 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Default Supabase configuration
-const defaultConfig = {
-  url: 'https://your-project.supabase.co',
-  key: 'your-anon-key'
-};
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || defaultConfig.url;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || defaultConfig.key;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+// جميع دوال الصور معطلة نهائياً ولا تعتمد على أي خدمة خارجية
 
 export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for videos
 export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
@@ -19,26 +8,16 @@ export interface UploadResponse {
   error?: string;
 }
 
-// تعطيل دوال رفع الصور مؤقتاً
-export const uploadProfileImage = async () => ({ url: '', error: 'رفع الصور معطل نهائياً' });
+export const uploadProfileImage = async (): Promise<UploadResponse> => ({
+  url: '',
+  error: 'خدمة رفع الصور معطلة حالياً'
+});
 
-export const uploadAdditionalImage = async () => ({ url: '', error: 'رفع الصور معطل نهائياً' });
+export const uploadAdditionalImage = async (): Promise<UploadResponse> => ({
+  url: '',
+  error: 'خدمة رفع الصور معطلة حالياً'
+});
 
-// حذف صورة من التخزين
-export const deleteImage = async (path: string): Promise<{ error?: string }> => {
-  try {
-    const { error } = await supabase.storage
-      .from('player-uploads')
-      .remove([path]);
-
-    if (error) {
-      console.error('Error deleting image:', error);
-      return { error: error.message };
-    }
-
-    return {};
-  } catch (error) {
-    console.error('Error in deleteImage:', error);
-    return { error: error instanceof Error ? error.message : 'Unknown error occurred' };
-  }
-};
+export const deleteImage = async (_path: string): Promise<{ error: string }> => ({
+  error: 'خدمة حذف الصور معطلة حالياً'
+});

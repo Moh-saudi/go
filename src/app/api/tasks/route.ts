@@ -1,24 +1,19 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { db } from '@/lib/firebase/config';
+import { collection, getDocs } from 'firebase/firestore';
 
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    
-    const { data: tasks, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
+    const tasksRef = collection(db, 'tasks');
+    const snapshot = await getDocs(tasksRef);
+    const tasks = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     return NextResponse.json({ tasks });
   } catch (error) {
     console.error('Error fetching tasks:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch tasks' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   }
-} 
+}
