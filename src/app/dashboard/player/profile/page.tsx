@@ -4,7 +4,6 @@ import DashboardLayout from "@/components/layout/DashboardLayout.jsx";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/lib/firebase/auth-provider';
 import { auth, db } from "@/lib/firebase/config";
-import { deleteImage } from '@/lib/utils/upload';
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import 'firebase/compat/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -464,6 +463,23 @@ export default function PlayerProfile() {
   const [newVideo, setNewVideo] = useState<{ url: string; desc: string }>({ url: '', desc: '' });
   const [showVideoForm, setShowVideoForm] = useState(false);
 
+  // دوال معطلة للصور
+  const handleProfileImageUpload = (...args: any[]) => {
+    setError('خدمة رفع الصور معطلة حالياً');
+  };
+
+  const handleDeleteProfileImage = () => {
+    setError('خدمة حذف الصور معطلة حالياً');
+  };
+
+  const handleAdditionalImageUpload = (...args: any[]) => {
+    setError('خدمة رفع الصور الإضافية معطلة حالياً');
+  };
+
+  const handleDeleteAdditionalImage = (...args: any[]) => {
+    setError('خدمة حذف الصور الإضافية معطلة حالياً');
+  };
+
   useEffect(() => {
     if (playerData) {
       setFormData(playerData);
@@ -619,233 +635,7 @@ export default function PlayerProfile() {
    * @param {string} userId - معرف المستخدم
    * @returns {Promise<string>} - رابط الصورة
    */
-  const uploadProfileImage = async () => {
-    return { url: '', error: 'خدمة رفع الصور معطلة حالياً' };
-  };
 
-  const uploadImageToSupabase = async () => {
-    throw new Error('خدمة رفع الصور معطلة حالياً');
-  };
-
-  const handleImageUpload = async () => {
-    setError('خدمة رفع الصور معطلة حالياً');
-  };
-
-  const handleDeleteProfileImage = async () => {
-    setError('خدمة حذف الصور معطلة حالياً');
-  };
-
-  /**
-   * رفع صورة إضافية إلى bucket للصور الإضافية
-   * @param {File} file - ملف الصورة
-   * @param {string} userId - معرف المستخدم
-   * @param {number} idx - فهرس الصورة (اختياري)
-   * @returns {Promise<string>} - رابط الصورة
-   */
-  const uploadAdditionalImage = async (file: File, userId: string, userToken: string): Promise<UploadResponse> => {
-    const supabase = await getSupabaseWithAuth();
-    try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${userId}/additional/${Date.now()}.${fileExt}`;
-      console.log('Uploading to path:', filePath);
-      const { data, error } = await supabase.storage
-        .from('player-uploads')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-      if (error) {
-        console.error('Error uploading additional image:', error.message, error);
-        throw new Error(`فشل في رفع الصورة: ${error.message || 'خطأ غير معروف'}`);
-      }
-      const { data: urlData } = supabase.storage
-        .from('player-uploads')
-        .getPublicUrl(filePath);
-      if (!urlData?.publicUrl) {
-        throw new Error('Failed to get public URL for uploaded image');
-      }
-      return {
-        url: urlData.publicUrl,
-        error: undefined
-      };
-    } catch (error) {
-      console.error('Error in uploadAdditionalImage:', error);
-      return {
-        url: '',
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
-    }
-  };
-
-  // Add these functions after the initSupabase function
-  const uploadImageToSupabase = async (file: File, bucket: string, path: string) => {
-    try {
-      const supabase = initSupabase();
-      if (!supabase) {
-        throw new Error('Supabase client is not initialized');
-      }
-
-      // التحقق من نوع الملف
-      if (!file.type.startsWith('image/')) {
-        throw new Error('الملف يجب أن يكون صورة');
-      }
-
-      // التحقق من حجم الملف (5MB كحد أقصى)
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('حجم الصورة يجب أن لا يتجاوز 5 ميجابايت');
-      }
-
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (error) {
-        console.error('Error uploading image:', error);
-        throw error;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(data.path);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
-
-  // Remove duplicate declarations and keep only the first ones
-  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith('image/')) {
-        setFormErrors(prev => ({ ...prev, profileImage: 'يجب أن يكون الملف صورة' }));
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setFormErrors(prev => ({ ...prev, profileImage: 'حجم الصورة يجب أن لا يتجاوز 5 ميجابايت' }));
-        return;
-      }
-      setUploadingProfileImage(true);
-      const userId = user?.uid;
-      if (!userId) {
-        setFormErrors(prev => ({ ...prev, profileImage: 'يجب تسجيل الدخول أولاً' }));
-        return;
-      }
-      const userToken = await user.getIdToken();
-      const result = await uploadProfileImage(file, userId, userToken);
-      if (result.error) {
-        setFormErrors(prev => ({ ...prev, profileImage: result.error }));
-        return;
-      }
-      setEditFormData(prev => ({ ...prev, profile_image: { url: result.url } }));
-    } catch (error) {
-      console.error('Error uploading profile image:', error);
-      setFormErrors(prev => ({
-        ...prev,
-        profileImage: error instanceof Error ? error.message : 'فشل في رفع الصورة. يرجى المحاولة مرة أخرى'
-      }));
-    } finally {
-      setUploadingProfileImage(false);
-    }
-  };
-
-  const handleAdditionalImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    if (!user || !user.uid) {
-      setError('يجب تسجيل الدخول أولاً قبل رفع الصور.');
-      return;
-    }
-    const file = e.target.files[0];
-    setIsUploading(true);
-    try {
-      const userToken = await user.getIdToken();
-      const result = await uploadAdditionalImage(file, user.uid, userToken);
-      if (result.url) {
-        setFormData(prev => ({
-          ...prev,
-          additional_images: [...(prev.additional_images || []), { url: result.url }]
-        }));
-      } else {
-        throw new Error(result.error || 'Invalid upload response');
-      }
-    } catch (error) {
-      setError('فشل في رفع الصورة الإضافية');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // حذف صورة إضافية من البوكت الجديد
-  const deleteAdditionalImageFromSupabase = async (path: string) => {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized');
-    }
-    try {
-      const { error } = await supabase.storage
-        .from('player-uploads') // ← استخدم البوكت الجديد
-        .remove([path]);
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error deleting additional image:', error);
-      throw error;
-    }
-  };
-
-  // Add delete image functions
-  const deleteImageFromSupabase = async (path: string) => {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized');
-    }
-
-    try {
-      const { error } = await supabase.storage
-        .from('player-uploads')
-        .remove([path]);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error deleting image:', error);
-      throw error;
-    }
-  };
-
-  const handleDeleteProfileImage = async () => {
-    if (!formData.profile_image?.url) return;
-    try {
-      const result = await deleteImage(formData.profile_image.url);
-      if (result.error) {
-        setFormErrors(prev => ({ ...prev, profileImage: result.error }));
-        return;
-      }
-      setFormData(prev => ({ ...prev, profile_image: null }));
-    } catch (error) {
-      setFormErrors(prev => ({ ...prev, profileImage: 'حدث خطأ أثناء حذف الصورة' }));
-    }
-  };
-
-  const handleDeleteAdditionalImage = async (index: number) => {
-    try {
-      const image = formData.additional_images[index];
-      if (!image?.url) return;
-      const result = await deleteImage(image.url);
-      if (result.error) {
-        setFormErrors(prev => ({ ...prev, additionalImage: result.error }));
-        return;
-      }
-      setFormData(prev => ({
-        ...prev,
-        additional_images: prev.additional_images.filter((_, i) => i !== index)
-      }));
-    } catch (error) {
-      setFormErrors(prev => ({ ...prev, additionalImage: 'حدث خطأ أثناء حذف الصورة' }));
-    }
-  };
 
   // =========== Form Handling Functions ===========
 
@@ -979,31 +769,7 @@ export default function PlayerProfile() {
     }));
   };
 
-  /**
-   * معالج رفع الصور إلى Supabase
-   */
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !user?.uid) return;
-    const file = e.target.files[0];
-    setIsUploading(true);
-    try {
-      const userToken = await user.getIdToken();
-      const result = await uploadProfileImage(file, user.uid, userToken);
-      if (result.url) {
-        setFormData(prev => ({
-          ...prev,
-          profile_image: { url: result.url }
-        }));
-      } else {
-        throw new Error(result.error || 'Invalid upload response');
-      }
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      setError('فشل في رفع الصورة');
-    } finally {
-      setIsUploading(false);
-    }
-  };
+
 
   // =========== Field Rendering Helpers ===========
 
