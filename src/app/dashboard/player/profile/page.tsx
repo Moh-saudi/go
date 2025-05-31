@@ -823,7 +823,11 @@ export default function PlayerProfile() {
   const handleDeleteProfileImage = async () => {
     if (!formData.profile_image?.url) return;
     try {
-      await deleteImage();
+      const result = await deleteImage(formData.profile_image.url);
+      if (result.error) {
+        setFormErrors(prev => ({ ...prev, profileImage: result.error }));
+        return;
+      }
       setFormData(prev => ({ ...prev, profile_image: null }));
     } catch (error) {
       setFormErrors(prev => ({ ...prev, profileImage: 'حدث خطأ أثناء حذف الصورة' }));
@@ -834,7 +838,11 @@ export default function PlayerProfile() {
     try {
       const image = formData.additional_images[index];
       if (!image?.url) return;
-      await deleteImage();
+      const result = await deleteImage(image.url);
+      if (result.error) {
+        setFormErrors(prev => ({ ...prev, additionalImage: result.error }));
+        return;
+      }
       setFormData(prev => ({
         ...prev,
         additional_images: prev.additional_images.filter((_, i) => i !== index)
