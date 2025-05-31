@@ -1880,7 +1880,7 @@ export default function PlayerProfile() {
                 />
                 {isEditing && (
                   <button
-                    onClick={handleDeleteAdditionalImage}
+                    onClick={() => handleDeleteAdditionalImage(idx)}
                     className="absolute p-1 text-white transition-opacity bg-red-500 rounded-full opacity-0 top-2 right-2 group-hover:opacity-100"
                   >
                     <X className="w-4 h-4" />
