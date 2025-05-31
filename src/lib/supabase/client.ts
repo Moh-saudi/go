@@ -1,4 +1,4 @@
-// Supabase client disabled
+// Supabase client completely disabled
 export const supabase = {
   storage: {
     from: () => ({

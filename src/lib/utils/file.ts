@@ -31,9 +31,9 @@ export const handleFileUpload = async (
   throw new Error('رفع الملفات معطل حالياً');
 };
 
-export async function uploadFile(file: File): Promise<string> {
+export const uploadFile = async () => {
   throw new Error('رفع الملفات معطل حالياً');
-}
+};
 
 export async function uploadFileToAzure(): Promise<string> {
   throw new Error('Azure Storage is disabled');

@@ -619,25 +619,20 @@ export default function PlayerProfile() {
    * @param {string} userId - معرف المستخدم
    * @returns {Promise<string>} - رابط الصورة
    */
-  const uploadProfileImage = async (file: File, userId: string, userToken: string): Promise<UploadResponse> => {
-    const supabase = await getSupabaseWithAuth();
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
-    const { error: uploadError, data } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true
-      });
-    if (uploadError) {
-      console.error('Error uploading profile image:', uploadError);
-      throw uploadError;
-    }
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-    return { url: publicUrl };
+  const uploadProfileImage = async () => {
+    return { url: '', error: 'خدمة رفع الصور معطلة حالياً' };
+  };
+
+  const uploadImageToSupabase = async () => {
+    throw new Error('خدمة رفع الصور معطلة حالياً');
+  };
+
+  const handleImageUpload = async () => {
+    setError('خدمة رفع الصور معطلة حالياً');
+  };
+
+  const handleDeleteProfileImage = async () => {
+    setError('خدمة حذف الصور معطلة حالياً');
   };
 
   /**

@@ -1,7 +1,7 @@
 // src/lib/supabase.js
 import { type SupabaseClient } from '@supabase/supabase-js';
 
-// تنفيذ نمط العازل (singleton) للتأكد من إنشاء عميل واحد فقط
+// Supabase config completely disabled
 let supabaseInstance: SupabaseClient | null = null;
 
 // Supabase config disabled
