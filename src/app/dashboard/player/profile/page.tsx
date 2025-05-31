@@ -439,10 +439,82 @@ export default function PlayerProfile() {
   const [showVideoForm, setShowVideoForm] = useState(false);
 
   // دوال رفع/حذف الصور
-  const handleProfileImageUpload = () => {};
-  const handleDeleteProfileImage = () => {};
-  const handleAdditionalImageUpload = () => {};
-  const handleDeleteAdditionalImage = () => {};
+  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.uid) return;
+    setUploadingProfileImage(true);
+    setFormErrors(prev => ({ ...prev, profile_image: undefined }));
+    try {
+      const supabase = await getSupabaseWithAuth();
+      const fileExt = file.name.split('.').pop();
+      const filePath = `profile-images/${user.uid}.${fileExt}`;
+      // حذف الصورة القديمة إذا وجدت
+      if (editFormData.profile_image?.url) {
+        const oldPath = editFormData.profile_image.url.split('/storage/v1/object/public/')[1];
+        if (oldPath) await supabase.storage.from('profile-images').remove([oldPath.replace('profile-images/', '')]);
+      }
+      const { error: uploadError } = await supabase.storage.from('profile-images').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('profile-images').getPublicUrl(filePath);
+      setEditFormData(prev => ({ ...prev, profile_image: { url: publicUrl } }));
+    } catch (err: any) {
+      setFormErrors(prev => ({ ...prev, profile_image: 'فشل رفع الصورة. حاول مرة أخرى.' }));
+    } finally {
+      setUploadingProfileImage(false);
+    }
+  };
+
+  const handleDeleteProfileImage = async () => {
+    if (!user?.uid || !editFormData.profile_image?.url) return;
+    setUploadingProfileImage(true);
+    setFormErrors(prev => ({ ...prev, profile_image: undefined }));
+    try {
+      const supabase = await getSupabaseWithAuth();
+      const filePath = editFormData.profile_image.url.split('/storage/v1/object/public/')[1];
+      if (filePath) await supabase.storage.from('profile-images').remove([filePath.replace('profile-images/', '')]);
+      setEditFormData(prev => ({ ...prev, profile_image: null }));
+    } catch (err: any) {
+      setFormErrors(prev => ({ ...prev, profile_image: 'فشل حذف الصورة.' }));
+    } finally {
+      setUploadingProfileImage(false);
+    }
+  };
+
+  const handleAdditionalImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.uid) return;
+    setIsUploading(true);
+    setFormErrors(prev => ({ ...prev, additionalImage: undefined }));
+    try {
+      const supabase = await getSupabaseWithAuth();
+      const fileExt = file.name.split('.').pop();
+      const filePath = `additional-images/${user.uid}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('additional-images').upload(filePath, file, { upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('additional-images').getPublicUrl(filePath);
+      setEditFormData(prev => ({ ...prev, additional_images: [...prev.additional_images, { url: publicUrl }] }));
+    } catch (err: any) {
+      setFormErrors(prev => ({ ...prev, additionalImage: 'فشل رفع الصورة الإضافية.' }));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteAdditionalImage = async (idx: number) => {
+    if (!user?.uid || !editFormData.additional_images[idx]?.url) return;
+    setIsUploading(true);
+    setFormErrors(prev => ({ ...prev, additionalImage: undefined }));
+    try {
+      const supabase = await getSupabaseWithAuth();
+      const filePath = editFormData.additional_images[idx].url.split('/storage/v1/object/public/')[1];
+      if (filePath) await supabase.storage.from('additional-images').remove([filePath.replace('additional-images/', '')]);
+      setEditFormData(prev => ({ ...prev, additional_images: prev.additional_images.filter((_, i) => i !== idx) }));
+    } catch (err: any) {
+      setFormErrors(prev => ({ ...prev, additionalImage: 'فشل حذف الصورة الإضافية.' }));
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (playerData) {

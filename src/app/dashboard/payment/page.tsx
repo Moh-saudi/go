@@ -2,8 +2,7 @@
 
 import DashboardLayout from "@/components/layout/DashboardLayout.jsx";
 import { auth, db } from '@/lib/firebase/config';
-import { createBrowserClient } from '@supabase/ssr';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -91,7 +90,7 @@ const PACKAGES: Record<string, PackageType> = {
 // خيارات الدفع مع الأيقونات
 const PAYMENT_METHODS = [
   { id: 'bank', name: 'تحويل بنكي', icon: '🏦' },
-  { id: 'mada', name: 'مدى', icon: '💳' },
+  { id: 'fawry', name: 'فوري', icon: '💸' },
   { id: 'apple', name: 'أبل باي', icon: '🍎' },
   { id: 'wallet', name: 'تحويل على محفظة', icon: '👛' }
 ];
@@ -99,7 +98,6 @@ const PAYMENT_METHODS = [
 export default function PaymentPage() {
   const router = useRouter();
   const [user, loading] = useAuthState(auth);
-  const [supabase, setSupabase] = useState<any>(null);
   const [selectedPackage, setSelectedPackage] = useState<string>('3months');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [transactionNumber, setTransactionNumber] = useState<string>('');
@@ -107,37 +105,22 @@ export default function PaymentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<boolean>(false);
+  const [receiptInfo, setReceiptInfo] = useState({
+    senderName: '',
+    transferDate: '',
+    notes: ''
+  });
+  const [bankInfo, setBankInfo] = useState({
+    accountName: '',
+    accountNumber: '',
+    bankName: ''
+  });
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [subscriptionEnd, setSubscriptionEnd] = useState<string>('');
+  const [paidAmount, setPaidAmount] = useState('');
 
   // كود تشخيصي
-  console.log('user:', user, 'loading:', loading, 'supabase:', supabase, 'selectedPackage:', selectedPackage, 'error:', error);
-
-  useEffect(() => {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase environment variables');
-      return;
-    }
-
-    const client = createBrowserClient(supabaseUrl, supabaseKey);
-    setSupabase(client);
-
-    // إعداد مستمع حالة المصادقة
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        // الحصول على توكن Firebase
-        const token = await user.getIdToken();
-        // تعيين التوكن في عميل Supabase
-        await client.auth.setSession({
-          access_token: token,
-          refresh_token: '',
-        });
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+  console.log('user:', user, 'loading:', loading);
 
   // التحقق من تسجيل الدخول
   useEffect(() => {
@@ -146,82 +129,114 @@ export default function PaymentPage() {
     }
   }, [user, loading, router]);
 
-  // معالجة رفع الإيصال
-  const handleReceiptUpload = async (file: File): Promise<string> => {
-    try {
-      if (!user) throw new Error('User not authenticated');
-
-      // تحديث التوكن قبل الرفع
-      const token = await user.getIdToken();
-      await supabase.auth.setSession({
-        access_token: token,
-        refresh_token: '',
-      });
-
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user.uid}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError, data } = await supabase.storage
-        .from('wallet')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('خطأ في الرفع:', uploadError);
-        throw new Error(`فشل في رفع الإيصال: ${uploadError.message}`);
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('wallet')
-        .getPublicUrl(filePath);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('خطأ في رفع الإيصال:', error);
-      throw new Error('فشل في رفع الإيصال');
-    }
-  };
+  // عند تغيير selectedPackage، حدّث قيمة paidAmount تلقائيًا
+  useEffect(() => {
+    setPaidAmount(PACKAGES[selectedPackage].price.toString());
+  }, [selectedPackage]);
 
   // معالجة تقديم الدفع
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !receipt || !transactionNumber || !paymentMethod) {
+    if (!user || !transactionNumber || !paymentMethod) {
       setError('يرجى إكمال جميع البيانات المطلوبة');
       return;
     }
-
+    if (!user.uid) {
+      setError('تعذر تحديد المستخدم. يرجى إعادة تسجيل الدخول.');
+      return;
+    }
+    if (!paidAmount || isNaN(Number(paidAmount)) || Number(paidAmount) <= 0) {
+      setError('يرجى إدخال قيمة المبلغ المحول بشكل صحيح');
+      return;
+    }
+    if (!receiptInfo.senderName || !receiptInfo.transferDate) {
+      setError('يرجى إدخال جميع بيانات الإيصال');
+      return;
+    }
+    if (paymentMethod === 'bank' && (!bankInfo.accountName || !bankInfo.accountNumber || !bankInfo.bankName)) {
+      setError('يرجى إدخال جميع بيانات الكارت البنكي');
+      return;
+    }
     setSubmitting(true);
     setError('');
-
     try {
-      // رفع الإيصال
-      const receiptUrl = await handleReceiptUpload(receipt);
-
-      // حفظ معلومات الدفع
-      const paymentInfo: PaymentInfo = {
-        transactionNumber,
-        packageType: selectedPackage,
-        amount: PACKAGES[selectedPackage].price,
-        receiptUrl,
-        status: 'pending'
+      const months = selectedPackage === '3months' ? 3 : selectedPackage === '6months' ? 6 : 12;
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + months);
+      setSubscriptionEnd(endDate.toLocaleDateString('ar-EG'));
+      // جلب بيانات العميل من قاعدة البيانات
+      type UserProfile = {
+        name?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+        taxNumber?: string;
       };
-
-      // حفظ في Firestore
+      let userProfile: UserProfile = {};
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          userProfile = userDoc.data() as UserProfile;
+        }
+      } catch (e) {
+        console.warn('تعذر جلب بيانات العميل من قاعدة البيانات:', e);
+      }
+      // حفظ بيانات الدفع
       await setDoc(doc(db, 'payments', `${user.uid}-${Date.now()}`), {
-        ...paymentInfo,
-        paymentMethod,
+        transactionNumber: transactionNumber || '',
+        packageType: selectedPackage || '',
+        amount: PACKAGES[selectedPackage]?.price || 0,
+        paidAmount: Number(paidAmount),
+        paymentMethod: paymentMethod || '',
         userId: user.uid,
-        createdAt: serverTimestamp()
+        createdAt: startDate,
+        subscriptionEnd: endDate,
+        receiptInfo: receiptInfo || {},
+        bankInfo: paymentMethod === 'bank' ? bankInfo : null,
+        status: 'pending'
       });
-
+      // تفعيل الاشتراك في users
+      await setDoc(doc(db, 'users', user.uid), {
+        subscription: {
+          type: selectedPackage,
+          start: startDate,
+          end: endDate,
+          status: 'active'
+        }
+      }, { merge: true });
+      // حفظ بيانات الاشتراك في subscriptions
+      await setDoc(doc(db, 'subscriptions', user.uid), {
+        plan_name: PACKAGES[selectedPackage]?.title || '',
+        start_date: startDate,
+        end_date: endDate,
+        status: 'pending',
+        payment_method: paymentMethod || '',
+        amount: PACKAGES[selectedPackage]?.price || 0,
+        currency: 'جنيه',
+        paidAmount: Number(paidAmount),
+        receiptInfo: receiptInfo || {},
+        bankInfo: paymentMethod === 'bank' ? bankInfo : null,
+        autoRenew: false,
+        transaction_id: transactionNumber || '',
+        invoice_number: `INV-${user.uid?.slice(0,6) || '000000'}-${Date.now()}`,
+        customer_name: userProfile.name || user.displayName || receiptInfo.senderName || '',
+        customer_email: userProfile.email || user.email || '',
+        customer_phone: userProfile.phone || user.phoneNumber || '',
+        billing_address: userProfile.address || '',
+        tax_number: userProfile.taxNumber || '',
+        payment_date: receiptInfo.transferDate || startDate.toISOString(),
+      });
+      setShowSuccessPopup(true);
       setSuccess(true);
-      setTimeout(() => router.push('/dashboard'), 2000);
-
+      setTimeout(() => {
+        setShowSuccessPopup(false);
+        router.push('/dashboard');
+      }, 6000);
     } catch (error) {
-      console.error('Error submitting payment:', error);
-      setError('حدث خطأ أثناء معالجة الدفع');
+      // طباعة تفاصيل الخطأ في الكونسول للمطور
+      console.error('تفاصيل الخطأ أثناء حفظ بيانات الدفع أو الاشتراك:', error);
+      setError('حدث خطأ أثناء معالجة الدفع. يرجى التأكد من اتصالك بالإنترنت وصلاحيات الحساب. إذا استمرت المشكلة راجع الإدارة.');
     } finally {
       setSubmitting(false);
     }
@@ -361,9 +376,7 @@ export default function PaymentPage() {
           <form onSubmit={handleSubmit} className="p-6 bg-white rounded-2xl shadow-lg">
             <div className="grid gap-6 md:grid-cols-2">
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-700">
-                  رقم العملية البنكية
-                </label>
+                <label className="block mb-2 text-sm font-medium text-gray-700">رقم العملية البنكية</label>
                 <input
                   type="text"
                   value={transactionNumber}
@@ -372,35 +385,85 @@ export default function PaymentPage() {
                   placeholder="أدخل رقم العملية البنكية"
                   required
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  يمكنك العثور على رقم العملية في إيصال التحويل
-                </p>
               </div>
-
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-700">
-                  إرفاق إيصال التحويل
-                </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={e => setReceipt(e.target.files?.[0] || null)}
-                    className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    required
-                  />
-                  {receipt && (
-                    <div className="mt-2 p-2 text-sm text-green-600 bg-green-50 rounded-lg">
-                      تم اختيار الملف: {receipt.name}
-                    </div>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  يرجى رفع صورة واضحة للإيصال
-                </p>
+                <label className="block mb-2 text-sm font-medium text-gray-700">قيمة المبلغ المحول (جنيه)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={paidAmount}
+                  readOnly
+                  className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl bg-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  placeholder="مثال: 120"
+                  required
+                />
               </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700">اسم المحول</label>
+                <input
+                  type="text"
+                  value={receiptInfo.senderName}
+                  onChange={e => setReceiptInfo(prev => ({ ...prev, senderName: e.target.value }))}
+                  className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  placeholder="اسم صاحب التحويل"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700">تاريخ التحويل</label>
+                <input
+                  type="date"
+                  value={receiptInfo.transferDate}
+                  onChange={e => setReceiptInfo(prev => ({ ...prev, transferDate: e.target.value }))}
+                  className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700">ملاحظات إضافية</label>
+                <input
+                  type="text"
+                  value={receiptInfo.notes}
+                  onChange={e => setReceiptInfo(prev => ({ ...prev, notes: e.target.value }))}
+                  className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  placeholder="أي ملاحظات (اختياري)"
+                />
+              </div>
+              {paymentMethod === 'bank' && (
+                <>
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">اسم صاحب الحساب البنكي</label>
+                    <input
+                      type="text"
+                      value={bankInfo.accountName}
+                      onChange={e => setBankInfo(prev => ({ ...prev, accountName: e.target.value }))}
+                      className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">رقم الحساب البنكي</label>
+                    <input
+                      type="text"
+                      value={bankInfo.accountNumber}
+                      onChange={e => setBankInfo(prev => ({ ...prev, accountNumber: e.target.value }))}
+                      className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">اسم البنك</label>
+                    <input
+                      type="text"
+                      value={bankInfo.bankName}
+                      onChange={e => setBankInfo(prev => ({ ...prev, bankName: e.target.value }))}
+                      className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      required
+                    />
+                  </div>
+                </>
+              )}
             </div>
-
             <div className="mt-6">
               <button
                 type="submit"
@@ -424,6 +487,18 @@ export default function PaymentPage() {
           </form>
         </div>
       </div>
+      {showSuccessPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
+          <div className="p-8 bg-white rounded-3xl shadow-2xl text-center animate-bounceIn">
+            <div className="mb-4 text-5xl">🎉</div>
+            <h2 className="mb-2 text-2xl font-bold text-green-700">تم إرسال بيانات الدفع بنجاح!</h2>
+            <p className="mb-2 text-lg text-gray-700">تم استلام طلبك وسيتم مراجعته من الإدارة خلال 24 ساعة.</p>
+            <p className="mb-2 text-md text-blue-600 font-semibold">سيتواصل معك فريقنا لتفعيل الاشتراك بعد مراجعة المستندات.</p>
+            <p className="mb-2 text-md text-gray-600">صلاحية الاشتراك حتى <span className="font-bold text-green-600">{subscriptionEnd}</span></p>
+            <div className="mt-4 text-3xl animate-bounce">🚀</div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
