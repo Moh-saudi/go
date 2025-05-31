@@ -1,7 +1,6 @@
 'use client';
 
 import DashboardLayout from "@/components/layout/DashboardLayout.jsx";
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { auth, db } from '@/lib/firebase/config';
 import { createBrowserClient } from '@supabase/ssr';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -19,6 +18,8 @@ interface PackageType {
   period: string;
   discount: string;
   features: string[];
+  popular: boolean;
+  icon: string;
 }
 
 interface PaymentInfo {
@@ -45,7 +46,9 @@ const PACKAGES: Record<string, PackageType> = {
       'دعم فني عبر البريد الإلكتروني',
       'تحديث بياناتك في أي وقت',
       'إشعارات بالعروض الجديدة',
-    ]
+    ],
+    popular: false,
+    icon: '⭐'
   },
   '6months': {
     title: 'باقة النجم الذهبي 🏅',
@@ -61,7 +64,9 @@ const PACKAGES: Record<string, PackageType> = {
       'تحليل أداء ملفك وزياراته',
       'أولوية في الظهور للأندية',
       'إشعار عند مشاهدة ملفك',
-    ]
+    ],
+    popular: true,
+    icon: '🏅'
   },
   '12months': {
     title: 'باقة النجم الأسطوري 👑',
@@ -77,12 +82,19 @@ const PACKAGES: Record<string, PackageType> = {
       'إمكانية تثبيت ملفك في أعلى نتائج البحث',
       'دعم فني VIP على مدار الساعة',
       'تقرير شهري مفصل عن أداء ملفك',
-    ]
+    ],
+    popular: false,
+    icon: '👑'
   }
 };
 
-// خيارات الدفع
-const PAYMENT_METHODS = ['تحويل بنكي', 'مدى', 'أبل باي', 'تحويل على محفظة'];
+// خيارات الدفع مع الأيقونات
+const PAYMENT_METHODS = [
+  { id: 'bank', name: 'تحويل بنكي', icon: '🏦' },
+  { id: 'mada', name: 'مدى', icon: '💳' },
+  { id: 'apple', name: 'أبل باي', icon: '🍎' },
+  { id: 'wallet', name: 'تحويل على محفظة', icon: '👛' }
+];
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -223,104 +235,192 @@ export default function PaymentPage() {
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white" dir="rtl">
-        <div className="max-w-2xl py-8 mx-auto">
-          <h2 className="mb-4 text-2xl font-bold text-center">اختر الباقة</h2>
-          <div className="grid gap-4 mb-8 md:grid-cols-3">
+        <div className="container px-4 py-8 mx-auto max-w-7xl">
+          {/* عنوان الصفحة */}
+          <div className="mb-8 text-center">
+            <h1 className="mb-2 text-3xl font-bold text-gray-900">اشترك الآن</h1>
+            <p className="text-gray-600">اختر الباقة المناسبة لك وابدأ رحلة النجاح</p>
+          </div>
+
+          {/* عرض الباقات */}
+          <div className="grid gap-8 mb-12 md:grid-cols-3">
             {Object.entries(PACKAGES).map(([key, pkg]) => (
               <div
                 key={key}
-                className={`border rounded-lg p-4 cursor-pointer transition-all ${selectedPackage === key ? 'border-blue-600 shadow-lg bg-blue-50' : 'border-gray-300 bg-white'}`}
+                className={`relative p-6 transition-all duration-300 transform border-2 rounded-2xl hover:scale-105 ${
+                  selectedPackage === key
+                    ? 'border-blue-500 shadow-xl bg-blue-50'
+                    : 'border-gray-200 bg-white hover:border-blue-300'
+                }`}
                 onClick={() => setSelectedPackage(key)}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-lg font-bold">{pkg.title}</span>
-                  <span className="font-bold text-green-600">{pkg.price} جنيه</span>
+                {/* شارة الأكثر شعبية */}
+                {pkg.popular && (
+                  <div className="absolute px-3 py-1 text-sm font-medium text-white transform -translate-y-1/2 bg-yellow-500 rounded-full -top-3 right-6">
+                    الأكثر شعبية
+                  </div>
+                )}
+
+                {/* أيقونة الباقة */}
+                <div className="mb-4 text-4xl text-center">{pkg.icon}</div>
+
+                {/* عنوان الباقة */}
+                <h3 className="mb-2 text-xl font-bold text-center text-gray-900">{pkg.title}</h3>
+
+                {/* السعر */}
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  <span className="text-2xl font-bold text-blue-600">{pkg.price} جنيه</span>
+                  <span className="text-sm text-gray-500 line-through">{pkg.originalPrice} جنيه</span>
+                  <span className="px-2 py-1 text-xs font-medium text-white bg-green-500 rounded-full">
+                    {pkg.discount} خصم
+                  </span>
                 </div>
-                <div className="mb-2 text-sm text-gray-500">
-                  <span className="line-through">{pkg.originalPrice} جنيه</span>
-                  <span className="ml-2 text-red-500">{pkg.discount} خصم</span>
+
+                {/* المدة */}
+                <div className="mb-4 text-center">
+                  <span className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-100 rounded-full">
+                    {pkg.period}
+                  </span>
                 </div>
-                <div className="mb-2 text-xs text-gray-700">{pkg.period}</div>
-                <ul className="ml-5 text-sm text-gray-700 list-disc">
-                  {pkg.features.map((f, i) => <li key={i}>{f}</li>)}
+
+                {/* المميزات */}
+                <ul className="space-y-3">
+                  {pkg.features.map((feature, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="text-green-500">✓</span>
+                      {feature}
+                    </li>
+                  ))}
                 </ul>
               </div>
             ))}
           </div>
 
-          <h3 className="mb-2 text-xl font-bold">اختر طريقة الدفع</h3>
-          <div className="flex gap-6 mb-6">
-            {PAYMENT_METHODS.map(method => (
-              <label key={method} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value={method}
-                  checked={paymentMethod === method}
-                  onChange={() => setPaymentMethod(method)}
-                />
-                {method}
-              </label>
-            ))}
+          {/* طرق الدفع */}
+          <div className="p-6 mb-8 bg-white rounded-2xl shadow-lg">
+            <h3 className="mb-4 text-xl font-bold text-gray-900">اختر طريقة الدفع</h3>
+            <div className="grid gap-4 md:grid-cols-4">
+              {PAYMENT_METHODS.map(method => (
+                <label
+                  key={method.id}
+                  className={`flex flex-col items-center p-4 transition-all duration-200 border-2 rounded-xl cursor-pointer hover:border-blue-300 ${
+                    paymentMethod === method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={method.id}
+                    checked={paymentMethod === method.id}
+                    onChange={() => setPaymentMethod(method.id)}
+                    className="hidden"
+                  />
+                  <span className="mb-2 text-2xl">{method.icon}</span>
+                  <span className="text-sm font-medium text-gray-700">{method.name}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* تعليمات خاصة عند اختيار تحويل على محفظة */}
-          {paymentMethod === 'تحويل على محفظة' && (
-            <div className="p-3 mb-4 text-center text-yellow-900 bg-yellow-100 border border-yellow-400 rounded">
-              يرجى التحويل على محفظة <b>فودافون كاش</b> أو <b>انستا باي</b> على الرقم:
-              <br />
-              <span className="text-lg font-bold select-all">01017799580</span>
-              <br />
-              <span className="text-xs text-gray-600">يرجى رفع صورة إيصال التحويل بعد الدفع.</span>
+          {paymentMethod === 'wallet' && (
+            <div className="p-6 mb-8 text-center bg-yellow-50 border-2 border-yellow-200 rounded-2xl">
+              <h4 className="mb-3 text-lg font-bold text-yellow-800">تعليمات التحويل</h4>
+              <p className="mb-2 text-yellow-700">
+                يرجى التحويل على محفظة <b>فودافون كاش</b> أو <b>انستا باي</b> على الرقم:
+              </p>
+              <div className="p-3 mb-3 text-xl font-bold text-yellow-900 bg-yellow-100 rounded-lg select-all">
+                01017799580
+              </div>
+              <p className="text-sm text-yellow-600">
+                يرجى رفع صورة إيصال التحويل بعد الدفع
+              </p>
             </div>
           )}
 
-          {/* رسالة الخطأ */}
+          {/* رسائل الخطأ والنجاح */}
           {error && (
-            <div className="mb-4 border-red-500">
-              <Alert open={Boolean(error)} onOpenChange={() => setError('')}>
-                <AlertDescription className="text-red-600">{error}</AlertDescription>
-              </Alert>
+            <div className="p-4 mb-6 text-red-700 bg-red-100 border-2 border-red-200 rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚠️</span>
+                <p>{error}</p>
+              </div>
             </div>
           )}
 
-          {/* رسالة النجاح */}
           {success && (
-            <Alert open={success} onOpenChange={() => setSuccess(false)}>
-              <AlertDescription className="text-green-600">
-                تم استلام طلب الدفع بنجاح! جاري تحويلك...
-              </AlertDescription>
-            </Alert>
+            <div className="p-4 mb-6 text-green-700 bg-green-100 border-2 border-green-200 rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">✅</span>
+                <p>تم استلام طلب الدفع بنجاح! جاري تحويلك...</p>
+              </div>
+            </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-4 mb-32 space-y-4">
-            <div>
-              <label>رقم العملية البنكية:</label>
-              <input
-                type="text"
-                value={transactionNumber}
-                onChange={e => setTransactionNumber(e.target.value)}
-                className="w-full p-2 border rounded"
-                required
-              />
+          {/* نموذج الدفع */}
+          <form onSubmit={handleSubmit} className="p-6 bg-white rounded-2xl shadow-lg">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700">
+                  رقم العملية البنكية
+                </label>
+                <input
+                  type="text"
+                  value={transactionNumber}
+                  onChange={e => setTransactionNumber(e.target.value)}
+                  className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  placeholder="أدخل رقم العملية البنكية"
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  يمكنك العثور على رقم العملية في إيصال التحويل
+                </p>
+              </div>
+
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700">
+                  إرفاق إيصال التحويل
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => setReceipt(e.target.files?.[0] || null)}
+                    className="w-full p-3 text-gray-700 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    required
+                  />
+                  {receipt && (
+                    <div className="mt-2 p-2 text-sm text-green-600 bg-green-50 rounded-lg">
+                      تم اختيار الملف: {receipt.name}
+                    </div>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  يرجى رفع صورة واضحة للإيصال
+                </p>
+              </div>
             </div>
-            <div>
-              <label>إرفاق إيصال التحويل:</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={e => setReceipt(e.target.files?.[0] || null)}
-                className="w-full p-2 border rounded"
-                required
-              />
+
+            <div className="mt-6">
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`w-full p-4 text-white font-medium rounded-xl transition-all duration-200 ${
+                  submitting
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
+                }`}
+              >
+                {submitting ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    جاري الإرسال...
+                  </div>
+                ) : (
+                  'إرسال طلب الدفع'
+                )}
+              </button>
             </div>
-            <button
-              type="submit"
-              className="w-full px-4 py-2 text-white bg-blue-600 rounded"
-              disabled={submitting}
-            >
-              {submitting ? 'جاري الإرسال...' : 'إرسال'}
-            </button>
           </form>
         </div>
       </div>
