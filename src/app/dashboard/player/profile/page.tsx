@@ -4,9 +4,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout.jsx";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/lib/firebase/auth-provider';
 import { auth, db } from "@/lib/firebase/config";
+import { createBrowserClient } from '@supabase/ssr';
 import 'firebase/compat/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { Check, Plus, Trash, X } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -307,30 +307,6 @@ const classNames = (...classes: (string | boolean | undefined | null)[]): string
   return classes.filter(Boolean).join(' ');
 };
 
-// Firebase Storage Setup
-const storage = getStorage();
-
-const uploadFile = async (file: File, path: string): Promise<string> => {
-  try {
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    return url;
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    throw error;
-  }
-};
-
-const deleteFile = async (url: string): Promise<void> => {
-  try {
-    const storageRef = ref(storage, url);
-    await deleteObject(storageRef);
-  } catch (error) {
-    console.error('Error deleting file:', error);
-    throw error;
-  }
-};
 
 // قائمة الأهداف والطموحات
 const OBJECTIVES_OPTIONS = [
@@ -422,7 +398,7 @@ const getSupabaseWithAuth = async () => {
 
   try {
     const token = await user.getIdToken();
-    return createClient(
+    return createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
@@ -442,7 +418,7 @@ const getSupabaseWithAuth = async () => {
 export default function PlayerProfile() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [supabase] = useState(() => initSupabase());
+  const [supabase, setSupabase] = useState<any>(null);
 
   // تعريف جميع المتغيرات اللازمة
   const [playerData, setPlayerData] = useState<PlayerFormData | null>(null);
@@ -462,65 +438,11 @@ export default function PlayerProfile() {
   const [newVideo, setNewVideo] = useState<{ url: string; desc: string }>({ url: '', desc: '' });
   const [showVideoForm, setShowVideoForm] = useState(false);
 
-  // دوال معطلة للصور
-  const handleProfileImageUpload = async (file: File) => {
-    try {
-      const path = `players/${user?.uid}/profile/${file.name}`;
-      const url = await uploadFile(file, path);
-      setFormData(prev => ({
-        ...prev,
-        profile_image: { url }
-      }));
-    } catch (error) {
-      console.error('Error uploading profile image:', error);
-      setError('Failed to upload image');
-    }
-  };
-
-  const handleDeleteProfileImage = async () => {
-    try {
-      if (formData.profile_image?.url) {
-        await deleteFile(formData.profile_image.url);
-        setFormData(prev => ({
-          ...prev,
-          profile_image: null
-        }));
-      }
-    } catch (error) {
-      console.error('Error deleting profile image:', error);
-      setError('Failed to delete image');
-    }
-  };
-
-  const handleAdditionalImageUpload = async (file: File) => {
-    try {
-      const path = `players/${user?.uid}/additional/${file.name}`;
-      const url = await uploadFile(file, path);
-      setFormData(prev => ({
-        ...prev,
-        additional_images: [...prev.additional_images, { url }]
-      }));
-    } catch (error) {
-      console.error('Error uploading additional image:', error);
-      setError('Failed to upload image');
-    }
-  };
-
-  const handleDeleteAdditionalImage = async (index: number) => {
-    try {
-      const image = formData.additional_images[index];
-      if (image?.url) {
-        await deleteFile(image.url);
-        setFormData(prev => ({
-          ...prev,
-          additional_images: prev.additional_images.filter((_, i) => i !== index)
-        }));
-      }
-    } catch (error) {
-      console.error('Error deleting additional image:', error);
-      setError('Failed to delete image');
-    }
-  };
+  // دوال رفع/حذف الصور
+  const handleProfileImageUpload = () => {};
+  const handleDeleteProfileImage = () => {};
+  const handleAdditionalImageUpload = () => {};
+  const handleDeleteAdditionalImage = () => {};
 
   useEffect(() => {
     if (playerData) {
