@@ -18,15 +18,9 @@ export interface UploadResponse {
 }
 
 // تعطيل دوال رفع الصور مؤقتاً
-export const uploadProfileImage = async (file: File, userId: string, userToken?: string): Promise<UploadResponse> => {
-  return { url: '', error: 'رفع الصور معطل مؤقتاً' };
-};
+export const uploadProfileImage = async () => ({ url: '', error: 'رفع الصور معطل نهائياً' });
 
-export const uploadAdditionalImage = async (file: File, userId: string, userToken?: string): Promise<UploadResponse> => {
-  return { url: '', error: 'رفع الصور معطل مؤقتاً' };
-};
+export const uploadAdditionalImage = async () => ({ url: '', error: 'رفع الصور معطل نهائياً' });
 
 // حذف صورة من التخزين
-export const deleteImage = async (path: string): Promise<{ error?: string }> => {
-  return { error: 'حذف الصور معطل مؤقتاً' };
-};
+export const deleteImage = async () => ({ error: 'حذف الصور معطل نهائياً' });
