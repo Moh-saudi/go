@@ -9,69 +9,24 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for videos
+export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
 
 export interface UploadResponse {
   url: string;
   error?: string;
 }
 
-// دالة مساعدة لرفع صورة عبر دالة Edge
-async function uploadImageViaEdgeFunction(file: File, userToken: string, edgeEndpoint: string): Promise<UploadResponse> {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch(edgeEndpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${userToken}`
-      },
-      body: formData
-    });
-    const result = await res.json();
-    if (!res.ok || result.error) {
-      return { url: '', error: result.error || 'فشل في رفع الصورة عبر الدالة الخارجية' };
-    }
-    return { url: result.url };
-  } catch (error) {
-    return { url: '', error: error instanceof Error ? error.message : 'Unknown error' };
-  }
-}
-
-// رفع صورة البروفايل عبر دالة Edge
+// تعطيل دوال رفع الصور مؤقتاً
 export const uploadProfileImage = async (file: File, userId: string, userToken?: string): Promise<UploadResponse> => {
-  if (!userToken) return { url: '', error: 'مفقود رمز المصادقة' };
-  const edgeEndpoint = '/api/edge-upload-profile';
-  return uploadImageViaEdgeFunction(file, userToken, edgeEndpoint);
+  return { url: '', error: 'رفع الصور معطل مؤقتاً' };
 };
 
-// رفع صورة إضافية عبر دالة Edge
 export const uploadAdditionalImage = async (file: File, userId: string, userToken?: string): Promise<UploadResponse> => {
-  if (!userToken) return { url: '', error: 'مفقود رمز المصادقة' };
-  const edgeEndpoint = '/api/edge-upload-additional';
-  return uploadImageViaEdgeFunction(file, userToken, edgeEndpoint);
+  return { url: '', error: 'رفع الصور معطل مؤقتاً' };
 };
 
 // حذف صورة من التخزين
 export const deleteImage = async (path: string): Promise<{ error?: string }> => {
-  try {
-    const { error } = await supabase.storage
-      .from('player-uploads')
-      .remove([path]);
-
-    if (error) {
-      console.error('Error deleting image:', error.message);
-      return {
-        error: 'فشل في حذف الصورة'
-      };
-    }
-
-    return {};
-  } catch (error) {
-    console.error('Error in deleteImage:', error instanceof Error ? error.message : 'Unknown error');
-    return {
-      error: 'حدث خطأ أثناء حذف الصورة'
-    };
-  }
+  return { error: 'حذف الصور معطل مؤقتاً' };
 };

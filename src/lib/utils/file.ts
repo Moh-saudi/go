@@ -1,6 +1,5 @@
 // src/lib/utils/file.ts
 
-import { uploadAdditionalImage } from '@/lib/utils/upload';
 import { createClient } from '@supabase/supabase-js';
 
 export const supabase = createClient(
@@ -9,20 +8,15 @@ export const supabase = createClient(
 );
 
 // تعريف أنواع الملفات المسموح بها وحجمها الأقصى
-
 export const allowedFileTypes = {
-  images: ['image/jpeg', 'image/png', 'image/webp'],
-  documents: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
   videos: ['video/mp4', 'video/webm']
 };
 
 export const maxFileSize = {
-  image: 5 * 1024 * 1024, // 5MB
-  document: 10 * 1024 * 1024, // 10MB
   video: 100 * 1024 * 1024 // 100MB
 };
 
-export const validateFile = (file: File, type: 'images' | 'documents' | 'videos'): boolean => {
+export const validateFile = (file: File, type: 'videos'): boolean => {
   if (!file) return false;
 
   // Check file type
@@ -32,9 +26,7 @@ export const validateFile = (file: File, type: 'images' | 'documents' | 'videos'
   }
 
   // Check file size
-  const maxSize = type === 'images' ? maxFileSize.image :
-                 type === 'documents' ? maxFileSize.document :
-                 maxFileSize.video;
+  const maxSize = maxFileSize.video;
 
   if (file.size > maxSize) {
     console.error('❌ حجم الملف كبير جداً');
@@ -46,29 +38,19 @@ export const validateFile = (file: File, type: 'images' | 'documents' | 'videos'
 
 export const handleFileUpload = async (
   file: File,
-  type: 'images' | 'documents' | 'videos'
+  type: 'videos'
 ): Promise<string | null> => {
   if (!validateFile(file, type)) return null;
 
   try {
-    if (type === 'images') {
-      // استخدم uploadAdditionalImage للصور الإضافية
-      const userId = 'USER_ID_HERE'; // استبدلها بالمعرف الفعلي للمستخدم
-      const result = await uploadAdditionalImage(file, userId);
-      return result.url || null;
-    } else {
-      const url = await uploadFile(file);
-      return url;
-    }
+    const url = await uploadFile(file);
+    return url;
   } catch (error) {
     console.error('❌ خطأ في رفع الملف:', error);
     return null;
   }
 };
 
-/**
- * Mock implementation of file upload that uses Supabase instead
- */
 export async function uploadFile(file: File): Promise<string> {
   try {
     const fileExt = file.name.split('.').pop();

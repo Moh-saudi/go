@@ -34,12 +34,22 @@ export async function POST(request) {
       return NextResponse.json({ error: 'لم يتم إرسال ملف' }, { status: 400 });
     }
 
+    // التحقق من نوع الملف
+    if (file.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'رفع الصور معطل مؤقتاً' }, { status: 400 });
+    }
+
+    // التحقق من أن الملف هو فيديو
+    if (!file.type.startsWith('video/')) {
+      return NextResponse.json({ error: 'نوع الملف غير مسموح به' }, { status: 400 });
+    }
+
     // بناء المسار الصحيح
-    const filePath = `${user.id}/additional/${Date.now()}-${file.name}`;
+    const filePath = `${user.id}/videos/${Date.now()}-${file.name}`;
 
     // رفع الملف إلى Supabase Storage
     const { data, error: uploadError } = await supabase.storage
-      .from('player-uploads')
+      .from('player-files')
       .upload(filePath, file.stream(), {
         cacheControl: '3600',
         upsert: false,
@@ -52,7 +62,7 @@ export async function POST(request) {
     // جلب الرابط العام
     const { data: publicUrl } = supabase
       .storage
-      .from('player-uploads')
+      .from('player-files')
       .getPublicUrl(data.path);
 
     return NextResponse.json({ url: publicUrl.publicUrl }, { status: 200 });
